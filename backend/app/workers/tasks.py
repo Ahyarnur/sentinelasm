@@ -8,7 +8,9 @@ generated so the platform can be demonstrated end-to-end.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import json
 
+import redis
 from celery import shared_task
 from sqlalchemy.orm import Session
 
@@ -17,9 +19,12 @@ from app.db.session import SessionLocal
 from app.models import Asset, Finding, Scan, Service, Target
 from app.scanners.registry import (
     ACTIVE_SCANNERS,
+    ALL_SCANNERS,
     CRAWL_SCANNERS,
     DISCOVERY_SCANNERS,
     PROBE_SCANNERS,
+    SCANNER_INVENTORY_KEY,
+    SCANNER_INVENTORY_TTL,
     VULN_SCANNERS,
 )
 
@@ -258,7 +263,7 @@ def run_full_scan(target_id: int, scan_id: int | None = None) -> dict:
         db.commit()
         db.refresh(scan)
 
-        summary = {
+        summary: dict = {
             "assets": 0,
             "services": 0,
             "endpoints": 0,
@@ -267,12 +272,29 @@ def run_full_scan(target_id: int, scan_id: int | None = None) -> dict:
             "enriched": 0,
         }
         errors: list[str] = []
+
+        def _checkpoint(phase: str) -> None:
+            """Catat fase yang akan berjalan + hitungan sejauh ini, lalu commit.
+
+            Tanpa ini ``summary`` baru terisi saat scan selesai, sehingga UI
+            tidak punya apa pun untuk ditampilkan selama beberapa menit.
+            """
+            scan.phase = phase
+            scan.summary = {**summary, **({"scanner_errors": errors} if errors else {})}
+            db.commit()
+
         try:
+            _checkpoint("discovery")
             summary["assets"] = discovery_phase(db, target, errors)
+            _checkpoint("probe")
             summary["services"] = probe_phase(db, target, errors)
+            _checkpoint("crawl")
             summary["endpoints"] = crawl_phase(db, target, errors)
+            _checkpoint("vuln")
             summary["findings"] = vuln_phase(db, target, errors)
+            _checkpoint("active")
             summary["active"] = active_phase(db, target, errors)
+            _checkpoint("enrich")
             summary["enriched"] = enrich_phase(db, target)
             asset_ids = [
                 a.id for a in db.query(Asset).filter(Asset.target_id == target.id).all()
@@ -292,6 +314,7 @@ def run_full_scan(target_id: int, scan_id: int | None = None) -> dict:
                 scan.status = "completed_with_errors"
 
         scan.summary = summary
+        scan.phase = None
         scan.finished_at = _now()
         db.commit()
         return {"scan_id": scan.id, **summary}
@@ -309,6 +332,27 @@ def schedule_all_targets() -> dict:
     for target_id in target_ids:
         run_full_scan.delay(target_id)
     return {"scheduled": target_ids}
+
+
+@shared_task(name="app.workers.tasks.report_scanners")
+def report_scanners() -> dict:
+    """Publikasikan ketersediaan scanner dari container worker ke Redis.
+
+    ``/system/scanners`` dijalankan di container ``backend`` yang tidak memuat
+    tool apa pun, sehingga tanpa laporan ini semua scanner selalu tampak tidak
+    tersedia.
+    """
+    scanners = [
+        {"name": s.name, "binary": s.binary, "available": s.available()}
+        for s in ALL_SCANNERS
+    ]
+    payload = {"reported_at": _now().isoformat(), "scanners": scanners}
+    client = redis.Redis.from_url(settings.redis_url)
+    client.set(SCANNER_INVENTORY_KEY, json.dumps(payload), ex=SCANNER_INVENTORY_TTL)
+    return {
+        "scanners": len(scanners),
+        "available": sum(1 for s in scanners if s["available"]),
+    }
 
 
 @shared_task(name="app.workers.tasks.reap_stale_scans")
@@ -332,6 +376,7 @@ def reap_stale_scans(max_age_minutes: int = 120) -> dict:
         reaped: list[int] = []
         for scan in stale:
             scan.status = "interrupted"
+            scan.phase = None
             scan.finished_at = _now()
             scan.summary = {
                 **(scan.summary or {}),

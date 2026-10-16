@@ -15,6 +15,9 @@ class Scan(Base):
     target_id: Mapped[int] = mapped_column(ForeignKey("targets.id", ondelete="CASCADE"))
     kind: Mapped[str] = mapped_column(String(32), default="full")
     status: Mapped[str] = mapped_column(String(32), default="queued")
+    # Fase yang sedang berjalan (discovery/probe/crawl/vuln/active/enrich).
+    # Kosong saat selesai — dipakai UI untuk menampilkan progres nyata.
+    phase: Mapped[str | None] = mapped_column(String(32), nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

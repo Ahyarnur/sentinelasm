@@ -72,8 +72,7 @@ Antrean Celery: `discovery`, `fingerprint`, `vulnscan`, `report`.
 
 ## Yang belum ada (lihat PLAN_ASM.md)
 
-- WebSocket progress real-time (saat ini polling).
+- WebSocket progress real-time (saat ini polling tiap 4 detik saat ada scan berjalan).
 - Diff antar scan.
 - Notifikasi **Telegram** (saat ini webhook Slack).
 - Lapisan **AI/LLM** (tokenizer.id).
-- Pemecahan dashboard menjadi halaman terpisah (Targets, Scans, Assets, Findings, Reports, Settings).

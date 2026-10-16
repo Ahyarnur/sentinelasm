@@ -24,7 +24,12 @@ Dokumentasi interaktif lengkap: `/docs` (Swagger) dan `/redoc`.
 | Method | Endpoint | Deskripsi |
 |---|---|---|
 | GET | `/targets/{id}/scans` | Riwayat scan sebuah target |
+| GET | `/scans` | Riwayat scan seluruh target (terbaru dulu, `?limit=`, maks 500) |
 | GET | `/scans/{id}` | Detail scan |
+
+Setiap scan memuat `status`, `phase` (`discovery` → `probe` → `crawl` → `vuln` →
+`active` → `enrich`, kosong saat tidak berjalan), `started_at`, `finished_at`, dan
+`summary` (hitungan ditulis bertahap per fase, plus `scanner_errors` / `error`).
 
 ## Assets
 
@@ -37,7 +42,7 @@ Dokumentasi interaktif lengkap: `/docs` (Swagger) dan `/redoc`.
 
 | Method | Endpoint | Deskripsi |
 |---|---|---|
-| GET | `/findings` | Daftar temuan (filter `asset_id`, dll.) |
+| GET | `/findings` | Daftar temuan (filter `asset_id`, `target_id`, `severity`, `status`) |
 | PATCH | `/findings/{id}` | Update status remediasi |
 
 ## Reports
@@ -54,12 +59,13 @@ Dokumentasi interaktif lengkap: `/docs` (Swagger) dan `/redoc`.
 | Method | Endpoint | Deskripsi |
 |---|---|---|
 | GET | `/dashboard/summary` | Ringkasan postur risiko |
-| GET | `/system/scanners` | Status ketersediaan scanner |
+| GET | `/system/scanners` | Status ketersediaan scanner (inventaris dari container `worker` via Redis; jatuh ke pengecekan lokal bila belum ada laporan) |
 | POST | `/webhooks/test` | Uji konfigurasi notifikasi |
 
 ## Belum diimplementasikan (lihat PLAN_ASM.md §13)
 
-`/auth/refresh`, `POST /scans`, `POST /scans/{id}/cancel`, `/scans/{id}/diff`,
-`/assets/graph`, `/findings/{id}/comments`, `/findings/{id}/ai-explain`,
-`/dashboard/trends`, `/schedules`, `/users`, `/settings/ai`, `/audit-logs`,
-`/integrations/telegram/test`, dan WebSocket `/ws/scans/{id}`.
+`/auth/refresh`, `/auth/change-password`, `POST /scans/{id}/cancel`,
+`/scans/{id}/diff`, `/assets/graph`, `/findings/{id}/comments`,
+`/findings/{id}/ai-explain`, `/dashboard/trends`, `/schedules`, `/users`,
+`/settings/ai`, `/audit-logs`, `/integrations/telegram/test`, dan WebSocket
+`/ws/scans/{id}`.

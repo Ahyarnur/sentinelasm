@@ -24,7 +24,7 @@ dilengkapi **dashboard manajemen** dan **continuous monitoring**.
 - **Vulnerability Scanning** — Nuclei templates, mapping versi → CVE, pemeriksaan miskonfigurasi.
 - **Risk Scoring** — prioritas berdasarkan severity, keterpaparan, dan kemudahan eksploitasi.
 - **Reporting** — laporan PDF/HTML/JSON/CSV (ringkasan eksekutif + detail teknis).
-- **Management Dashboard** — tabel aset, detail temuan, grafik tren, status remediasi.
+- **Management Dashboard** — 9 halaman (ikhtisar, target, aset, temuan, scan, laporan, pengaturan), progres scan per fase, dan status remediasi.
 - **Alerting & Continuous Monitoring** — notifikasi **Telegram** (rencana) + webhook/email opsional + scan berkala.
 
 ---
@@ -136,9 +136,9 @@ Detail lengkap tiap tool dan pola integrasinya ada di
 │  ├─ Dockerfile.worker     # image worker + toolkit scanning
 │  └─ requirements.txt
 └─ frontend/
-   ├─ app/                  # layout + halaman dashboard
-   ├─ components/           # StatCard, SeverityChart, TargetTable, FindingsTable, AuthForm
-   ├─ lib/                  # api.ts, types.ts, ui.ts
+   ├─ app/                  # 9 rute: login, ikhtisar, targets(+[id]), assets, findings, scans, reports, settings
+   ├─ components/           # AppShell, ScanProgress, tabel, panel, tombol
+   ├─ lib/                  # api, types, ui, format, hooks, cn
    ├─ Dockerfile
    └─ package.json
 ```
@@ -158,6 +158,7 @@ Detail lengkap tiap tool dan pola integrasinya ada di
 - [x] Object storage untuk artefak laporan (PDF/HTML) + endpoint unduh
 - [x] Enrichment CVE/EPSS (NVD + FIRST EPSS, dengan cache)
 - [x] Dashboard frontend minimal (login, target, scan, ringkasan, temuan)
+- [x] Dashboard dipecah menjadi 9 halaman + progres scan real (fase, timer, error scanner)
 - [x] Mode mock untuk demo tanpa memasang tool eksternal
 - [ ] Notifikasi otomatis saat temuan baru (webhook/email) — belum dikerjakan
 

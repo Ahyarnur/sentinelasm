@@ -24,11 +24,16 @@ celery_app.conf.update(
             "task": "app.workers.tasks.reap_stale_scans",
             "schedule": 60 * 15,
         },
+        "report-scanners": {
+            "task": "app.workers.tasks.report_scanners",
+            "schedule": 60 * 5,
+        },
     },
     task_routes={
         "app.workers.tasks.run_full_scan": {"queue": "discovery"},
         "app.workers.tasks.schedule_all_targets": {"queue": "discovery"},
         "app.workers.tasks.reap_stale_scans": {"queue": "discovery"},
+        "app.workers.tasks.report_scanners": {"queue": "discovery"},
     },
 )
 

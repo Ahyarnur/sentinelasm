@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.db.session import get_db
-from app.models import Finding
+from app.models import Asset, Finding
 from app.schemas.schemas import FindingRead, FindingUpdate
 
 router = APIRouter(prefix="/findings", tags=["findings"])
@@ -13,12 +13,17 @@ router = APIRouter(prefix="/findings", tags=["findings"])
 @router.get("", response_model=list[FindingRead])
 def list_findings(
     asset_id: int | None = Query(default=None),
+    target_id: int | None = Query(default=None),
     severity: str | None = Query(default=None),
     status: str | None = Query(default=None),
     db: Session = Depends(get_db),
     _: object = Depends(get_current_user),
 ) -> list[Finding]:
     query = db.query(Finding)
+    if target_id is not None:
+        query = query.join(Asset, Finding.asset_id == Asset.id).filter(
+            Asset.target_id == target_id
+        )
     if asset_id is not None:
         query = query.filter(Finding.asset_id == asset_id)
     if severity:

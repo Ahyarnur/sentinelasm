@@ -24,6 +24,17 @@ def list_scans(
     )
 
 
+@router.get("/scans", response_model=list[ScanRead])
+def list_all_scans(
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    _: object = Depends(get_current_user),
+) -> list[Scan]:
+    """Riwayat scan seluruh target, terbaru lebih dulu."""
+    bounded = max(1, min(limit, 500))
+    return db.query(Scan).order_by(Scan.id.desc()).limit(bounded).all()
+
+
 @router.get("/scans/{scan_id}", response_model=ScanRead)
 def get_scan(
     scan_id: int,

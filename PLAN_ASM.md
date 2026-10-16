@@ -160,9 +160,9 @@ sentinelasm/
 │  ├─ requirements.txt   # dependensi untuk build Docker
 │  └─ Dockerfile(.worker)
 ├─ frontend/
-│  ├─ app/               # halaman Next.js (layout, page)
-│  ├─ components/        # StatCard, SeverityChart, TargetTable, FindingsTable, AuthForm
-│  ├─ lib/               # api.ts, types.ts, ui.ts
+│  ├─ app/               # 9 rute: login, ikhtisar, targets(+[id]), assets, findings, scans, reports, settings
+│  ├─ components/        # AppShell, ScanProgress, tabel, panel, tombol
+│  ├─ lib/               # api, types, ui, format, hooks, cn
 │  └─ Dockerfile
 ├─ deploy/
 │  ├─ docker-compose.yml # stack utama (dijalankan dari root via make)
@@ -582,9 +582,34 @@ dan datanya langsung tampil di dashboard.
 **Belum diimplementasikan / langkah berikutnya**
 
 1. Fitur §15 (AI/LLM) dan §16 (Telegram) belum diimplementasikan.
-2. Dashboard masih satu halaman (`frontend/app/page.tsx`) → belum dipecah menjadi
-   halaman-halaman di §9.
-3. Endpoint yang belum ada tetap seperti dicatat di [`docs/api.md`](./docs/api.md)
-   (mis. `POST /auth/change-password`, `POST /scans`, diff, schedules, users, audit-logs).
-4. `/api/v1/system/scanners` masih melaporkan `available: false` karena dijalankan di
-   container `backend` (tanpa tool); seharusnya mencerminkan konteks `worker`.
+2. Endpoint yang belum ada tetap seperti dicatat di [`docs/api.md`](./docs/api.md)
+   (mis. `POST /auth/change-password`, diff, schedules, users, audit-logs).
+3. Penjadwalan per target belum dihormati: tugas beat memindai **semua** target
+   setiap hari tanpa melihat `schedule_cron`, sehingga target tidak bisa
+   di-*opt out* dari pemindaian harian.
+4. `POST /targets/{id}/scan` belum menolak scan ganda yang masih berjalan. UI
+   menonaktifkan tombolnya, tetapi API masih menerima.
+
+### 17.2 Progres scan & pemecahan dashboard (16 Okt 2026)
+
+Progres yang ditampilkan adalah data nyata, bukan persentase karangan:
+
+| Bagian | Sumber data | Berkas |
+|---|---|---|
+| Timer berjalan | `scans.started_at` (sudah ada) | `frontend/components/ScanProgress.tsx` |
+| Stepper 6 fase | kolom baru `scans.phase` | `backend/app/workers/tasks.py` |
+| Hitungan sementara | `scans.summary` ditulis per fase, bukan hanya di akhir | `backend/app/workers/tasks.py` |
+| Error scanner | `summary.scanner_errors` / `summary.error` | `frontend/components/ScanProgress.tsx` |
+| Status scanner | inventaris dari container worker lewat Redis (`sentinelasm:scanners`) | `backend/app/workers/tasks.py`, `backend/app/api/v1/system.py` |
+
+Migrasi baru: `a7c1f2b9d4e6_add_scan_phase`. Dashboard dipecah menjadi 9 rute:
+`/login`, `/` (Ikhtisar), `/targets`, `/targets/[id]`, `/assets`, `/findings`,
+`/scans`, `/reports`, `/settings` — di bawah grup rute `(dashboard)` dengan
+`AppShell`, `useRequireAuth`, dan hook `useResource` (polling adaptif: 4 detik saat
+ada scan berjalan, 15–30 detik saat idle).
+
+Endpoint baru/pendukung: `GET /scans` (riwayat semua target) dan filter `target_id`
+pada `GET /findings`. Bila broker tidak dapat dihubungi, `POST /targets/{id}/scan`
+kini membalas **503** dengan pesan jelas — sebelumnya 500 tanpa header CORS sehingga
+UI hanya menampilkan “Failed to fetch”.
+

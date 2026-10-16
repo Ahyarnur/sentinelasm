@@ -93,6 +93,7 @@ class ScanRead(BaseModel):
     target_id: int
     kind: str
     status: str
+    phase: str | None = None
     started_at: datetime | None
     finished_at: datetime | None
     created_at: datetime | None = None

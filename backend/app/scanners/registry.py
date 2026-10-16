@@ -33,6 +33,12 @@ ALL_SCANNERS = (
     + ACTIVE_SCANNERS
 )
 
+# Worker memublikasikan ketersediaan tool-nya ke Redis; endpoint /system/scanners
+# membaca kunci ini. Tanpa itu, pengecekan di container `backend` selalu gagal
+# karena tool-nya memang hanya dipasang di container `worker`.
+SCANNER_INVENTORY_KEY = "sentinelasm:scanners"
+SCANNER_INVENTORY_TTL = 900
+
 
 def get_adapter(name: str) -> ScannerAdapter | None:
     for scanner in ALL_SCANNERS:

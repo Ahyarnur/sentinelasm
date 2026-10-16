@@ -1,4 +1,6 @@
 """Target management endpoints."""
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -75,5 +77,18 @@ def trigger_scan(
     db.commit()
     db.refresh(scan)
 
-    run_full_scan.delay(target_id, scan.id)
+    try:
+        run_full_scan.delay(target_id, scan.id)
+    except Exception as exc:  # noqa: BLE001 - broker bisa tidak tersedia
+        # Tanpa ini, kegagalan broker memunculkan 500 tanpa header CORS dan UI
+        # hanya menampilkan "Failed to fetch" yang tidak informatif.
+        scan.status = "failed"
+        scan.finished_at = datetime.now(timezone.utc)
+        scan.summary = {"error": f"Antrean tidak dapat dihubungi: {exc}"}
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Antrean scan tidak dapat dihubungi. Coba lagi beberapa saat.",
+        ) from exc
+
     return scan

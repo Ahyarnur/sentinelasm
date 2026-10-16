@@ -836,6 +836,413 @@
     font-size: 12px;
     color: var(--ink-muted);
   }
+
+  /* --- Pemberitahuan sukses --- */
+  .notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 18px;
+    padding: 12px 16px;
+    border-radius: var(--r-ctl);
+    background: var(--accent-bg);
+    color: var(--accent);
+    border: 1px solid var(--accent-soft);
+    font-size: 13px;
+  }
+
+  /* --- Tautan & teks sekunder dalam sel --- */
+  .cell-link {
+    color: var(--accent);
+    font-weight: 520;
+    text-decoration: none;
+  }
+
+  .cell-link:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .cell-sub {
+    margin-top: 2px;
+    font-size: 12px;
+    color: var(--ink-faint);
+  }
+
+  /* --- Feed ringkas (scan terbaru di Ikhtisar) --- */
+  .feed {
+    display: flex;
+    flex-direction: column;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .feed li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .feed li:last-child {
+    border-bottom: 0;
+  }
+
+  .feed-main {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  /* --- Tabel bersarang & baris detail --- */
+  .tbl-nested thead th {
+    background: transparent;
+    padding-top: 4px;
+  }
+
+  .tbl-nested tbody tr:hover {
+    background: transparent;
+  }
+
+  .row-detail > td {
+    background: var(--paper-soft);
+    padding-top: 10px;
+    padding-bottom: 14px;
+  }
+
+  .row-detail-links {
+    margin-top: 10px;
+    font-size: 12px;
+  }
+
+  .row-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0;
+    background: none;
+    border: 0;
+    cursor: pointer;
+    text-align: left;
+    color: inherit;
+  }
+
+  .row-toggle:hover .cell-title {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .row-toggle-icon {
+    color: var(--st-warn);
+    font-size: 12px;
+  }
+
+  /* --- Input kecil & pencarian --- */
+  .input-sm {
+    width: auto;
+    min-width: 118px;
+    padding: 5px 8px;
+    font-size: 12px;
+    border-radius: 9px;
+  }
+
+  .input-search {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .input-search > svg {
+    position: absolute;
+    left: 11px;
+    color: var(--ink-faint);
+    pointer-events: none;
+  }
+
+  .input-search > .input {
+    padding-left: 32px;
+  }
+
+  /* --- Progres scan (A/B/D) --- */
+  .scan-progress {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .scan-progress-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .scan-progress-meta {
+    font-size: 12px;
+    color: var(--ink-muted);
+  }
+
+  .scan-progress-timer {
+    margin-left: auto;
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.4px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stepper {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .step {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 9px 10px;
+    border-radius: var(--r-ctl);
+    border: 1px solid var(--line);
+    background: var(--paper-soft);
+  }
+
+  .step[data-state="done"] {
+    background: var(--accent-bg);
+    border-color: var(--accent-soft);
+    color: var(--accent);
+  }
+
+  .step[data-state="current"] {
+    background: var(--surface-2);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(168, 207, 148, 0.28);
+    color: var(--accent);
+  }
+
+  .step[data-state="pending"] {
+    color: var(--ink-faint);
+  }
+
+  .step-dot {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    flex: none;
+    border-radius: var(--r-pill);
+    background: var(--surface-2);
+    border: 1px solid var(--line-strong);
+  }
+
+  .step[data-state="current"] .step-dot {
+    animation: step-spin 1.4s linear infinite;
+  }
+
+  @keyframes step-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .step-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.25;
+  }
+
+  .step-text b {
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .step-text em {
+    font-size: 11px;
+    font-style: normal;
+    color: var(--ink-faint);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .scan-counts {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .scan-count {
+    display: flex;
+    flex-direction: column;
+    padding: 10px 12px;
+    border-radius: var(--r-ctl);
+    border: 1px solid var(--line);
+    background: var(--paper-soft);
+  }
+
+  .scan-count b {
+    font-size: 20px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .scan-count span {
+    font-size: 11px;
+    color: var(--ink-muted);
+  }
+
+  .scan-errors {
+    margin-top: 16px;
+    padding: 12px 14px;
+    border-radius: var(--r-ctl);
+    border: 1px solid rgba(179, 144, 60, 0.3);
+    background: var(--sev-medium-bg);
+    color: var(--sev-medium-ink);
+    font-size: 12px;
+  }
+
+  .scan-error-line,
+  .scan-error-title {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .scan-error-line + .scan-error-line {
+    margin-top: 6px;
+  }
+
+  .scan-error-title {
+    margin-bottom: 6px;
+    font-weight: 620;
+  }
+
+  .scan-errors ul {
+    margin: 0;
+    padding-left: 26px;
+    list-style: disc;
+  }
+
+  .scan-errors li {
+    margin-top: 2px;
+    overflow-wrap: anywhere;
+  }
+
+  .mini-stepper {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 11px;
+    color: var(--ink-muted);
+  }
+
+  .mini-stepper i {
+    width: 14px;
+    height: 5px;
+    border-radius: var(--r-pill);
+    background: var(--line-strong);
+  }
+
+  .mini-stepper i[data-state="done"] {
+    background: var(--accent-bar-face);
+  }
+
+  .mini-stepper i[data-state="current"] {
+    background: var(--st-run);
+  }
+
+  .mini-stepper-time {
+    margin-left: 6px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* --- Catatan panel & daftar polos --- */
+  .panel-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin: 0;
+    padding: 11px 24px;
+    background: var(--sev-medium-bg);
+    color: var(--sev-medium-ink);
+    border-bottom: 1px solid var(--line);
+    font-size: 12px;
+  }
+
+  .plain-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 13px;
+  }
+
+  .plain-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    color: var(--ink-muted);
+  }
+
+  .plain-list li > svg {
+    margin-top: 3px;
+    flex: none;
+    color: var(--ink-faint);
+  }
+
+  .plain-list b {
+    color: var(--ink);
+  }
+
+  .code-block {
+    margin: 0;
+    padding: 10px 12px;
+    border-radius: var(--r-ctl);
+    background: var(--paper-soft);
+    border: 1px solid var(--line);
+    font-size: 12px;
+    white-space: pre-wrap;
+    overflow-x: auto;
+    overflow-wrap: anywhere;
+  }
+
+  .btn-danger {
+    color: var(--sev-critical-ink);
+    border-color: rgba(168, 68, 53, 0.28);
+  }
+
+  .btn-danger:hover:not(:disabled) {
+    background: var(--sev-critical-bg);
+    border-color: var(--sev-critical);
+    color: var(--sev-critical-ink);
+  }
+}
+
+/* Nav punya 7 tautan: sembunyikan chip pengguna lebih awal agar tidak berdesakan. */
+@media (max-width: 1080px) {
+  .user-chip {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .stepper {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 640px) {
@@ -884,6 +1291,22 @@
   .bar-row {
     grid-template-columns: minmax(80px, 108px) minmax(0, 1fr) auto;
     gap: 10px;
+  }
+
+  .stepper {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .scan-counts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .scan-progress-timer {
+    margin-left: 0;
+  }
+
+  .panel-note {
+    padding-inline: 16px;
   }
 }
 
