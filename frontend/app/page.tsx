@@ -12,7 +12,15 @@ import {
   StatCard,
   TargetTable,
 } from "@/components";
-import { API_URL, api, clearToken, getIdentity, getToken } from "@/lib/api";
+import {
+  API_URL,
+  ApiError,
+  api,
+  clearToken,
+  getIdentity,
+  getToken,
+  setUnauthorizedHandler,
+} from "@/lib/api";
 import type { Finding, ScanInfo, Summary, Target } from "@/lib/types";
 
 const FINDINGS_LIMIT = 20;
@@ -38,6 +46,23 @@ export default function DashboardPage() {
     }
   }, []);
 
+  // Sesi kedaluwarsa (401): buang token lalu kembali ke layar masuk.
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      clearToken();
+      setAuthed(false);
+      setIdentity(null);
+      setError("Sesi Anda berakhir. Silakan masuk kembali.");
+    });
+    return () => setUnauthorizedHandler(null);
+  }, []);
+
+  // 401 sudah ditangani handler sesi — jangan timpa dengan body mentah server.
+  const reportError = useCallback((e: unknown) => {
+    if (e instanceof ApiError && e.status === 401) return;
+    setError((e as Error).message);
+  }, []);
+
   const refresh = useCallback(async () => {
     try {
       const [s, t, f] = await Promise.all([
@@ -61,9 +86,9 @@ export default function DashboardPage() {
       setUpdatedAt(new Date());
       setError(null);
     } catch (e) {
-      setError((e as Error).message);
+      reportError(e);
     }
-  }, []);
+  }, [reportError]);
 
   useEffect(() => {
     if (authed) void refresh();
@@ -113,7 +138,7 @@ export default function DashboardPage() {
       setDomain("");
       await refresh();
     } catch (e) {
-      setError((e as Error).message);
+      reportError(e);
     } finally {
       setAdding(false);
     }
@@ -128,7 +153,7 @@ export default function DashboardPage() {
       }));
       void refresh();
     } catch (e) {
-      setError((e as Error).message);
+      reportError(e);
     }
   }
 
@@ -137,7 +162,7 @@ export default function DashboardPage() {
       const report = await api.createReport(id);
       await api.downloadReport(report.id, report.kind);
     } catch (e) {
-      setError((e as Error).message);
+      reportError(e);
     }
   }
 

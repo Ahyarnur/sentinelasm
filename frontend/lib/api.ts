@@ -18,6 +18,24 @@ export function clearToken() {
   window.localStorage.removeItem(TOKEN_KEY);
 }
 
+/** Error HTTP dengan status, supaya pemanggil bisa membedakan 401 dari error lain. */
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
+let onUnauthorized: (() => void) | null = null;
+
+/** Dipasang dashboard: dipanggil saat request ber-token ditolak 401 (sesi kedaluwarsa). */
+export function setUnauthorizedHandler(handler: (() => void) | null) {
+  onUnauthorized = handler;
+}
+
 /** Identitas dari klaim JWT (untuk ditampilkan di nav). Null bila token tak terbaca. */
 export function getIdentity(): string | null {
   const token = getToken();
@@ -44,7 +62,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_URL}/api/v1${path}`, { ...init, headers });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`${res.status}: ${text}`);
+    // Hanya request yang benar-benar membawa token yang boleh memicu logout.
+    if (res.status === 401 && token) onUnauthorized?.();
+    throw new ApiError(res.status, `${res.status}: ${text}`);
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
@@ -86,7 +106,10 @@ export const api = {
     const res = await fetch(`${API_URL}/api/v1/reports/${reportId}/download`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
-    if (!res.ok) throw new Error(`Gagal mengunduh laporan (${res.status})`);
+    if (!res.ok) {
+      if (res.status === 401) onUnauthorized?.();
+      throw new ApiError(res.status, `Gagal mengunduh laporan (${res.status})`);
+    }
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
