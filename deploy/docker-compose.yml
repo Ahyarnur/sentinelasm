@@ -1,0 +1,152 @@
+# SentinelASM — Docker Compose stack
+#
+# Compose ini berada di deploy/ (lihat PLAN_ASM.md §5).
+# Jalankan dari root repo:
+#
+#   docker compose --env-file .env -f deploy/docker-compose.yml up -d --build
+#
+# atau cukup:
+#
+#   make up
+#
+name: sentinelasm
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sentinelasm-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sentinel}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sentinel}
+      POSTGRES_DB: ${POSTGRES_DB:-sentinelasm}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sentinel}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    mem_limit: ${POSTGRES_MEM_LIMIT:-768m}
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: sentinelasm-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    mem_limit: ${REDIS_MEM_LIMIT:-256m}
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ../backend
+    container_name: sentinelasm-backend
+    env_file: ../.env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-sentinel}:${POSTGRES_PASSWORD:-sentinel}@postgres:5432/${POSTGRES_DB:-sentinelasm}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - artifacts:/app/artifacts
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    mem_limit: ${BACKEND_MEM_LIMIT:-512m}
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.worker
+    container_name: sentinelasm-worker
+    env_file: ../.env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-sentinel}:${POSTGRES_PASSWORD:-sentinel}@postgres:5432/${POSTGRES_DB:-sentinelasm}
+      REDIS_URL: redis://redis:6379/0
+      MOCK_SCANNERS: ${MOCK_SCANNERS:-false}
+      ENABLE_ACTIVE_SCANNING: ${ENABLE_ACTIVE_SCANNING:-false}
+      PORT_SCAN_TOP: ${PORT_SCAN_TOP:-1000}
+      NUCLEI_SEVERITY: ${NUCLEI_SEVERITY:-critical,high,medium}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - artifacts:/app/artifacts
+    command: ["celery", "-A", "app.workers.celery_app", "worker", "-l", "info", "-Q", "discovery,fingerprint,vulnscan,report"]
+    mem_limit: ${WORKER_MEM_LIMIT:-1400m}
+    restart: unless-stopped
+
+  beat:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.worker
+    container_name: sentinelasm-beat
+    env_file: ../.env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-sentinel}:${POSTGRES_PASSWORD:-sentinel}@postgres:5432/${POSTGRES_DB:-sentinelasm}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - artifacts:/app/artifacts
+    command: ["celery", "-A", "app.workers.celery_app", "beat", "-l", "info"]
+    mem_limit: ${BEAT_MEM_LIMIT:-192m}
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ../frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    container_name: sentinelasm-frontend
+    # Profile "web": dashboard hanya ikut jalan bila diminta. Server produksi
+    # (backend + DB saja) cukup `docker compose up` tanpa profile ini.
+    profiles: ["web"]
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    mem_limit: ${FRONTEND_MEM_LIMIT:-384m}
+    restart: unless-stopped
+
+  # Reverse proxy opsional (PLAN_ASM.md §5). Aktifkan bersama profile "web":
+  #   docker compose --profile web --profile proxy -f deploy/docker-compose.yml up -d
+  #   (atau: make proxy-up)
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: sentinelasm-nginx
+    profiles: ["proxy"]
+    depends_on:
+      - backend
+      - frontend
+    ports:
+      - "${NGINX_PORT:-8080}:80"
+    volumes:
+      - ./nginx/sentinelasm.conf:/etc/nginx/conf.d/default.conf:ro
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
+  artifacts:

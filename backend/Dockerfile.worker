@@ -1,0 +1,90 @@
+# Worker image: includes the open-source scanning toolkit.
+# The lighter API image (Dockerfile) does not ship these tools.
+#
+# Catatan: tool ProjectDiscovery butuh Go modern (>= 1.24). Debian bookworm hanya
+# menyediakan Go 1.19, jadi tool Go dibangun di stage terpisah dengan image resmi
+# golang, lalu binernya disalin ke runtime yang ramping.
+#
+# CGO dimatikan: cukup untuk semua tool di sini dan membuat `naabu` tidak
+# memerlukan libpcap saat runtime.
+
+# ---------- Stage 1: build tool Go ----------
+FROM golang:1.26-bookworm AS gotools
+
+ENV CGO_ENABLED=0 \
+    GOFLAGS=-buildvcs=false \
+    GOPATH=/go \
+    PATH=/go/bin:/usr/local/go/bin:$PATH
+
+RUN go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest \
+    && go install github.com/projectdiscovery/dnsx/cmd/dnsx@latest \
+    && go install github.com/projectdiscovery/naabu/v2/cmd/naabu@latest \
+    && go install github.com/projectdiscovery/httpx/cmd/httpx@latest \
+    && go install github.com/projectdiscovery/katana/cmd/katana@latest \
+    && go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest \
+    && go install github.com/lc/gau/v2/cmd/gau@latest \
+    && go install github.com/hahwul/dalfox/v2@latest \
+    && go install github.com/ffuf/ffuf/v2@latest
+
+# ---------- Stage 2: runtime ----------
+FROM python:3.12-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    DEBIAN_FRONTEND=noninteractive \
+    PATH=/usr/local/bin:$PATH
+
+# System dependencies: build tools, nmap, TLS tooling, Java (ZAP), utilitas.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        libpq-dev \
+        ca-certificates \
+        nmap \
+        dnsutils \
+        openssl \
+        bsdmainutils \
+        procps \
+        sqlmap \
+        git \
+        curl \
+        bash \
+        default-jre-headless \
+    && rm -rf /var/lib/apt/lists/*
+
+# testssl.sh (TLS assessment)
+RUN git clone --depth 1 https://github.com/drwetter/testssl.sh.git /opt/testssl \
+    && ln -s /opt/testssl/testssl.sh /usr/local/bin/testssl.sh \
+    && chmod +x /opt/testssl/testssl.sh
+
+# cloud_enum (public cloud storage enumeration)
+RUN git clone --depth 1 https://github.com/initstring/cloud_enum.git /opt/cloud_enum \
+    && pip install --no-cache-dir requests dnspython \
+    && printf '#!/bin/sh\nexec python3 /opt/cloud_enum/cloud_enum.py "$@"\n' > /usr/local/bin/cloud_enum \
+    && chmod +x /usr/local/bin/cloud_enum
+
+# OWASP ZAP (baseline scan). Tolerant: skipped if the download fails.
+RUN set -eux; \
+    if curl -fsSL -o /tmp/zap.tar.gz \
+        https://github.com/zaproxy/zaproxy/releases/download/v2.16.1/ZAP_2.16.1_Linux.tar.gz; then \
+        mkdir -p /opt/zap && tar -xzf /tmp/zap.tar.gz -C /opt/zap --strip-components=1; \
+        printf '#!/bin/sh\nexec python3 /opt/zap/zap-baseline.py "$@"\n' > /usr/local/bin/zap-baseline.py; \
+        chmod +x /usr/local/bin/zap-baseline.py; \
+    else echo "ZAP download skipped"; fi; \
+    rm -f /tmp/zap.tar.gz
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Binari scanner dari stage builder. Disalin SETELAH `pip install`: paket Python
+# `httpx` juga memasang console script bernama `httpx` di /usr/local/bin, yang akan
+# menimpa binary ProjectDiscovery bila urutan ini terbalik.
+COPY --from=gotools /go/bin/ /usr/local/bin/
+
+COPY . .
+
+# Nuclei templates for offline use.
+RUN nuclei -update-templates -silent || true
+
+CMD ["celery", "-A", "app.workers.celery_app", "worker", "-l", "info", "-Q", "discovery,fingerprint,vulnscan,report"]
