@@ -1,19 +1,25 @@
 "use client";
 
+import { Activity, ExternalLink, LogOut, Plus, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import {
   AuthForm,
+  Button,
   FindingsTable,
+  Panel,
   SeverityChart,
   StatCard,
   TargetTable,
 } from "@/components";
-import { api, clearToken, getToken } from "@/lib/api";
+import { API_URL, api, clearToken, getIdentity, getToken } from "@/lib/api";
 import type { Finding, ScanInfo, Summary, Target } from "@/lib/types";
+
+const FINDINGS_LIMIT = 20;
 
 export default function DashboardPage() {
   const [authed, setAuthed] = useState(false);
+  const [identity, setIdentity] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -21,9 +27,15 @@ export default function DashboardPage() {
   const [findings, setFindings] = useState<Finding[]>([]);
   const [scans, setScans] = useState<Record<number, ScanInfo>>({});
   const [domain, setDomain] = useState("");
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [adding, setAdding] = useState(false);
 
   useEffect(() => {
-    if (getToken()) setAuthed(true);
+    if (getToken()) {
+      setAuthed(true);
+      setIdentity(getIdentity());
+    }
   }, []);
 
   const refresh = useCallback(async () => {
@@ -46,6 +58,7 @@ export default function DashboardPage() {
         if (newest) latest[target.id] = newest;
       });
       setScans(latest);
+      setUpdatedAt(new Date());
       setError(null);
     } catch (e) {
       setError((e as Error).message);
@@ -66,6 +79,15 @@ export default function DashboardPage() {
     return () => clearInterval(id);
   }, [authed, refresh, scanActive]);
 
+  const manualRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refresh();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refresh]);
+
   async function handleAuth(email: string, password: string) {
     try {
       try {
@@ -74,6 +96,7 @@ export default function DashboardPage() {
         /* sudah terdaftar — abaikan */
       }
       await api.login(email, password);
+      setIdentity(getIdentity());
       setAuthed(true);
       setError(null);
     } catch (e) {
@@ -81,14 +104,18 @@ export default function DashboardPage() {
     }
   }
 
-  async function addTarget() {
-    if (!domain.trim()) return;
+  async function addTarget(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!domain.trim() || adding) return;
+    setAdding(true);
     try {
       await api.createTarget(domain.trim());
       setDomain("");
       await refresh();
     } catch (e) {
       setError((e as Error).message);
+    } finally {
+      setAdding(false);
     }
   }
 
@@ -118,71 +145,200 @@ export default function DashboardPage() {
     return <AuthForm onSubmit={handleAuth} error={error} />;
   }
 
+  const counts = summary?.severity_counts ?? {};
+  const critical = counts.critical ?? 0;
+  const urgent = critical + (counts.high ?? 0);
+  const shownFindings = Math.min(findings.length, FINDINGS_LIMIT);
+
   return (
-    <main className="mx-auto max-w-5xl p-6">
-      <header className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">SentinelASM</h1>
-        <button
-          onClick={() => {
-            clearToken();
-            setAuthed(false);
-          }}
-          className="text-sm text-slate-400 hover:text-slate-200"
-        >
-          Keluar
-        </button>
-      </header>
+    <div className="min-h-screen">
+      <div className="shell">
+        <header className="float-nav">
+          <a className="brand" href="#ikhtisar">
+            <span className="brand-mark" aria-hidden="true" />
+            <span className="brand-text">
+              <strong>SentinelASM</strong>
+              <span>Attack Surface Management</span>
+            </span>
+          </a>
 
-      {error && <p className="mb-4 text-sm text-red-400">{error}</p>}
+          <nav className="nav-tabs" aria-label="Bagian halaman">
+            <a href="#ikhtisar">Ikhtisar</a>
+            <a href="#target">Target</a>
+            <a href="#temuan">Temuan</a>
+          </nav>
 
-      <section className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label="Target" value={summary?.targets ?? 0} />
-        <StatCard label="Aset" value={summary?.assets ?? 0} />
-        <StatCard label="Temuan" value={summary?.findings ?? 0} />
-        <StatCard
-          label="Critical"
-          value={summary?.severity_counts?.critical ?? 0}
-          accent="text-red-400"
-        />
-      </section>
+          <div className="nav-end">
+            {identity ? (
+              <span className="user-chip" title={identity}>
+                <b aria-hidden="true">{identity.slice(0, 1).toUpperCase()}</b>
+                <span>{identity}</span>
+              </span>
+            ) : null}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => void manualRefresh()}
+              disabled={refreshing}
+              aria-label="Perbarui data"
+              title="Perbarui data"
+            >
+              <RefreshCw size={13} aria-hidden="true" />
+              <span className="btn-label">
+                {refreshing ? "Memperbarui…" : "Perbarui"}
+              </span>
+            </Button>
+            <Button
+              variant="soft"
+              size="sm"
+              onClick={() => {
+                clearToken();
+                setAuthed(false);
+              }}
+              aria-label="Keluar"
+              title="Keluar"
+            >
+              <LogOut size={13} aria-hidden="true" />
+              <span className="btn-label">Keluar</span>
+            </Button>
+          </div>
+        </header>
+      </div>
 
-      <section className="mb-6 rounded-lg border border-slate-800 bg-slate-900/40 p-4">
-        <h2 className="mb-2 font-semibold">Distribusi Severity</h2>
-        <SeverityChart counts={summary?.severity_counts ?? {}} />
-      </section>
+      <main className="shell page-body">
+        {error ? <p className="alert">{error}</p> : null}
 
-      <section className="mb-6">
-        <h2 className="mb-2 font-semibold">Tambah Target</h2>
-        <div className="flex gap-2">
-          <input
-            className="flex-1 rounded border border-slate-700 bg-slate-900 p-2"
-            placeholder="contoh.com"
-            value={domain}
-            onChange={(e) => setDomain(e.target.value)}
-          />
-          <button
-            onClick={addTarget}
-            className="rounded bg-indigo-600 px-4 font-medium hover:bg-indigo-500"
-          >
-            Tambah
-          </button>
+        <div className="page-head" id="ikhtisar">
+          <div className="min-w-0">
+            <span className="eyebrow">Monitor · attack surface</span>
+            <h1>Ikhtisar pemindaian</h1>
+            <p className="lede">
+              Ringkasan target, aset, dan temuan dari seluruh pemindaian yang pernah
+              dijalankan.
+            </p>
+          </div>
+          <div className="page-head-meta">
+            <span>
+              Diperbarui{" "}
+              {updatedAt
+                ? updatedAt.toLocaleTimeString("id-ID", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                    timeZone: "Asia/Jakarta",
+                  })
+                : "—"}{" "}
+              WIB
+            </span>
+            {scanActive ? (
+              <span className="chip chip-high">
+                <Activity size={12} aria-hidden="true" className="mr-1" />
+                Scan berjalan
+              </span>
+            ) : null}
+          </div>
         </div>
-      </section>
 
-      <section className="mb-6">
-        <h2 className="mb-2 font-semibold">Target</h2>
-        <TargetTable
-          targets={targets}
-          scans={scans}
-          onScan={runScan}
-          onReport={downloadReport}
-        />
-      </section>
+        <section className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard label="Target" value={summary?.targets ?? 0} hint="Domain terdaftar" />
+          <StatCard
+            label="Aset"
+            value={summary?.assets ?? 0}
+            hint="Host & subdomain ditemukan"
+          />
+          <StatCard
+            label="Temuan"
+            value={summary?.findings ?? 0}
+            hint={urgent > 0 ? `${urgent} perlu prioritas` : "Tanpa prioritas tinggi"}
+          />
+          <StatCard
+            label="Kritis"
+            value={critical}
+            tone="critical"
+            hint={critical > 0 ? "Perlu tindakan segera" : "Tidak ada"}
+          />
+        </section>
 
-      <section>
-        <h2 className="mb-2 font-semibold">Temuan Terbaru</h2>
-        <FindingsTable findings={findings} />
-      </section>
-    </main>
+        <div className="mb-4 grid gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
+          <Panel title="Distribusi severity" meta="Seluruh temuan pada semua target">
+            <div className="panel-body">
+              <SeverityChart counts={counts} />
+            </div>
+          </Panel>
+
+          <Panel
+            title="Tambah target"
+            meta="Scan dijalankan manual setelah target ditambahkan"
+          >
+            <div className="panel-body">
+              <form className="flex flex-col gap-3" onSubmit={addTarget}>
+                <div className="field">
+                  <label htmlFor="domain">Domain</label>
+                  <input
+                    id="domain"
+                    className="input"
+                    name="domain"
+                    placeholder="contoh.com"
+                    autoComplete="off"
+                    spellCheck={false}
+                    value={domain}
+                    onChange={(e) => setDomain(e.target.value)}
+                  />
+                </div>
+                <Button type="submit" disabled={adding || !domain.trim()}>
+                  <Plus size={15} aria-hidden="true" />
+                  {adding ? "Menambahkan…" : "Tambah target"}
+                </Button>
+                <p className="panel-meta">
+                  Hanya pindai domain yang Anda miliki atau berwenang menguji.
+                </p>
+              </form>
+            </div>
+          </Panel>
+        </div>
+
+        <Panel
+          id="target"
+          title="Target"
+          meta={`${targets.length} domain terdaftar`}
+          flush
+          className="mb-4"
+        >
+          <TargetTable
+            targets={targets}
+            scans={scans}
+            onScan={runScan}
+            onReport={downloadReport}
+          />
+        </Panel>
+
+        <Panel
+          id="temuan"
+          title="Temuan terbaru"
+          meta={
+            findings.length > 0
+              ? `Menampilkan ${shownFindings} dari ${findings.length} temuan`
+              : "Belum ada temuan"
+          }
+          flush
+        >
+          <FindingsTable findings={findings} limit={FINDINGS_LIMIT} />
+        </Panel>
+      </main>
+
+      <footer className="shell site-foot">
+        <span>SentinelASM · Platform Attack Surface Management</span>
+        <nav>
+          <a href={`${API_URL}/docs`} target="_blank" rel="noreferrer">
+            Dokumentasi API
+            <ExternalLink size={11} aria-hidden="true" className="ml-1 inline align-[-1px]" />
+          </a>
+          <a href={`${API_URL}/health`} target="_blank" rel="noreferrer">
+            Status API
+            <ExternalLink size={11} aria-hidden="true" className="ml-1 inline align-[-1px]" />
+          </a>
+        </nav>
+      </footer>
+    </div>
   );
 }

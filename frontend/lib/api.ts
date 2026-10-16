@@ -1,6 +1,6 @@
 // SentinelASM API client
 
-const API_URL =
+export const API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 const TOKEN_KEY = "sentinelasm_token";
@@ -16,6 +16,21 @@ export function setToken(token: string) {
 
 export function clearToken() {
   window.localStorage.removeItem(TOKEN_KEY);
+}
+
+/** Identitas dari klaim JWT (untuk ditampilkan di nav). Null bila token tak terbaca. */
+export function getIdentity(): string | null {
+  const token = getToken();
+  if (!token) return null;
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return null;
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const json = JSON.parse(atob(normalized)) as { sub?: string; email?: string };
+    return json.email ?? json.sub ?? null;
+  } catch {
+    return null;
+  }
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {

@@ -110,7 +110,7 @@ di-diff untuk mendeteksi aset atau kerentanan baru.
 | Cache / Broker | **Redis** | Antrean job, cache hasil API eksternal, rate limiting |
 | Scanning Engine | **Subfinder, Amass, dnsx, naabu, httpx, katana, nuclei, dan lainnya** | Tool recon & vuln scanning open-source yang matang (lihat **Bagian 14**) |
 | Frontend | **React + Next.js + TypeScript** | Dashboard modern, SSR, ekosistem komponen luas |
-| UI Components | **shadcn/ui + Tailwind CSS + Recharts** | Cepat dibangun, konsisten, grafik siap pakai |
+| UI Components | **Tailwind CSS + komponen internal (`components/`) + lucide-react** | Lapisan komponen sendiri di atas token CSS — tanpa ketergantungan pustaka UI pihak ketiga (lihat **Bagian 17.1**) |
 | Reporting | **WeasyPrint / ReportLab** | Konversi HTML → PDF |
 | Notifikasi | **Telegram Bot API** (+ webhook/SMTP/Slack opsional) | Sesuai keputusan: Telegram jadi kanal utama |
 | AI/LLM | **tokenizer.id** (OpenAI-compatible) | Ringkasan, triage, saran remediasi (lihat **Bagian 15**) |
@@ -553,6 +553,27 @@ Backend sudah berjalan di server pribadi (Proxmox) dan dapat diakses publik:
 | Registrasi | publik **dimatikan** (`ALLOW_REGISTRATION=false`) |
 
 Rincian operasional: [`docs/server-ct-asm.md`](./docs/server-ct-asm.md).
+
+### 17.1 Sistem Desain Dashboard
+
+Tampilan dashboard diselaraskan dengan referensi visual yang diminta
+(<https://nutaraline.co.uk/>) — kertas tulang hangat, tinta hijau tua, kartu
+bergaris rambut, dan nav kaca mengambang — lalu disesuaikan dengan kebutuhan ASM.
+
+| Aspek | Nilai |
+|---|---|
+| Tipografi | DM Sans, di-host sendiri (`frontend/public/fonts/`) |
+| Kertas / tinta | `#f5f5ee` / `#29392d` |
+| Permukaan | `#fffef9` / `#ffffff` dengan garis rambut `#dce2d4` |
+| Aksen | hijau `#315e43`, sorotan `#a8cf94`, chip `#e3ecd9` |
+| Radius | 16px (kartu) · 22px (panel) · 12px (kontrol) |
+| Sumber token | `frontend/app/globals.css` (`:root`) → `frontend/tailwind.config.ts` |
+
+Aturan yang dipegang: semua warna hanya lewat token di `globals.css` (tanpa hex di
+komponen), grafik distribusi severity digambar sebagai bar CSS (ketergantungan
+`recharts` dilepas), dan setiap kelas varian ditulis sebagai literal utuh supaya
+tidak ter-*purge* Tailwind — karena itu `./lib/**` ikut dipindai di
+`tailwind.config.ts`.
 
 Uji end-to-end pertama (target `scanme.nmap.org`) **berhasil**: scan `completed` dalam
 ±4m44s, menghasilkan 1 aset / 4 service / 20 endpoint / 22 temuan (2 medium, 20 info),

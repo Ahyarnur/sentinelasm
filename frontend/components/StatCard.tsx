@@ -3,16 +3,19 @@ import type { ReactNode } from "react";
 export function StatCard({
   label,
   value,
-  accent,
+  hint,
+  tone,
 }: {
   label: string;
   value: ReactNode;
-  accent?: string;
+  hint?: ReactNode;
+  tone?: "accent" | "critical";
 }) {
   return (
-    <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-4">
-      <div className="text-sm text-slate-400">{label}</div>
-      <div className={`text-2xl font-semibold ${accent ?? ""}`}>{value}</div>
+    <div className="stat" data-tone={tone}>
+      <span className="stat-label">{label}</span>
+      <span className="stat-value">{value}</span>
+      {hint ? <span className="stat-hint">{hint}</span> : null}
     </div>
   );
 }
